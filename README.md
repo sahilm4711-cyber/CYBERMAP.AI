@@ -209,6 +209,7 @@ vulnerability record.
 - `docs/TESTING.md` — how to run tests, coverage, E2E walk
 - `docs/DEVELOPMENT.md` — setup, env vars, troubleshooting
 - `docs/TESTING_REPORT.md` — final testing report
+- `docs/DEPLOYMENT.md` — deploy to Vercel + Render
 
 ## Security
 

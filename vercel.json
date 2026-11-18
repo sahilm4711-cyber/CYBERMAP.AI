@@ -1,0 +1,1 @@
+{"$schema":"https://openapi.vercel.sh/vercel.json","buildCommand":"npm run build --prefix frontend","env":{"NEXT_PUBLIC_API_URL":"https://YOUR-RENDER-SERVICE.onrender.com"},"framework":"nextjs","installCommand":"npm install --prefix frontend","outputDirectory":"frontend/.next"}

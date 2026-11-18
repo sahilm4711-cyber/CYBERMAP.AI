@@ -26,6 +26,11 @@ from app.core.config import settings
 
 
 def create_app() -> FastAPI:
+    # SECURITY (R4): the interactive API docs and the raw OpenAPI schema
+    # are dev-only. In production they are disabled entirely — a public
+    # /docs page hands an attacker the full endpoint map (the same
+    # exposure Curion shipped with). Local dev keeps them on.
+    docs_enabled = settings.environment != "production"
     app = FastAPI(
         title="CyberMap AI",
         description=(
@@ -37,8 +42,9 @@ def create_app() -> FastAPI:
             "research workspace and learning center."
         ),
         version=settings.app_version,
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
     )
 
     app.add_middleware(
@@ -67,7 +73,7 @@ def create_app() -> FastAPI:
             "service": "cybermap-ai",
             "version": settings.app_version,
             "environment": settings.environment,
-            "docs": "/docs",
+            "docs": "/docs" if docs_enabled else None,
             "health": "/health",
         }
 

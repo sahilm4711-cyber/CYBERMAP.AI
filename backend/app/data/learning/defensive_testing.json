@@ -1,0 +1,53 @@
+{
+  "slug": "defensive_testing",
+  "title": "Defensive Testing \u2014 Proving Your Controls Work",
+  "levels": {
+    "beginner": "A control you have never tested is a hope, not a defence. Defensive testing means deliberately checking that the protections you built actually stop the bad case: the wrong user, the bad input, the expired token.",
+    "intermediate": "Useful test types: unit tests for validation and authorisation helpers; integration tests that log in as user B and try to touch user A's data (expect 404); dependency and secret scans in CI; and header/configuration checks against a live staging deployment.",
+    "advanced": "Make the tests part of the pipeline so they run on every change: a test that only runs when someone remembers to run it will be skipped exactly when it matters. Record the result \u2014 a passing security test is evidence you can show, not just a feeling."
+  },
+  "key_points": [
+    "Test the negative case: user B vs user A's data must fail.",
+    "Test expired, revoked and tampered tokens, not only valid ones.",
+    "Scan dependencies and secrets automatically in CI.",
+    "Check security headers and TLS on staging, not only in code review.",
+    "Keep the tests in the pipeline so they run on every change."
+  ],
+  "defensive_examples": [
+    {
+      "title": "Isolation test pattern (two users, one object)",
+      "language": "python",
+      "code": "register_user(client, 'alice'); register_user(client, 'bob')\nlogin_user(client, 'alice')\nnote = client.post('/api/v1/research/notes', json={...}).json()\nlogin_user(client, 'bob')\nresp = client.get(f\"/api/v1/research/notes/{note['id']}\")\nassert resp.status_code == 404  # B must not see A's note",
+      "explanation": "This is the exact pattern Phase 8 uses: create as A, switch to B, expect 404. It catches missing ownership checks immediately."
+    }
+  ],
+  "related_cwe_ids": [
+    "CWE-862",
+    "CWE-863",
+    "CWE-307"
+  ],
+  "knowledge_check": [
+    {
+      "question": "Why test with a second user account instead of only checking your own access works?",
+      "options": [
+        "Because the critical failure is another user reaching your data",
+        "Because one account is slower",
+        "Because tests need two names",
+        "Because the database requires it"
+      ],
+      "answer_index": 0,
+      "explanation": "Your own access working proves nothing about isolation. The B-tries-A's-data test is the one that catches missing ownership checks."
+    },
+    {
+      "question": "Where should security tests run so they are not skipped under pressure?",
+      "options": [
+        "Automatically in CI on every change",
+        "Only before a major release",
+        "Only on the developer's laptop",
+        "Nowhere \u2014 manual checks are enough"
+      ],
+      "answer_index": 0,
+      "explanation": "Automated pipeline tests run every time, including the rushed change on a Friday. Manual checks get skipped exactly then."
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "slug": "remediation",
+  "title": "Remediation \u2014 Fixing, Verifying and Prioritising",
+  "levels": {
+    "beginner": "Remediation is the work after a finding: understand the root cause, fix it at the right layer, prove the fix works, and make sure the same bug cannot come back quietly.",
+    "intermediate": "Prioritise by real risk, not only by score: exploitability (is it reachable? is there a public exploit? is it in CISA KEV?), exposure (internet-facing? sensitive data?), and blast radius. A medium bug on an internet-facing login page can matter more than a critical bug in an unused internal tool.",
+    "advanced": "Fix at the root-cause layer when you can (a shared validation library beats ten one-off patches), add a regression test that fails if the bug returns, and track the fix to closure with a due date \u2014 KEV entries even carry a due date for exactly this reason."
+  },
+  "key_points": [
+    "Prioritise by exploitability + exposure + data at risk, not score alone.",
+    "Fix the root cause at the shared layer where possible.",
+    "Add a regression test that fails if the bug returns.",
+    "Verify the fix in staging with the same test that found the bug.",
+    "Track remediation to closure with an owner and a due date."
+  ],
+  "defensive_examples": [
+    {
+      "title": "A remediation checklist for one finding",
+      "language": "text",
+      "code": "1. Reproduce the finding in a lab (never on production data)\n2. Identify the root cause and the layer to fix\n3. Fix + add a regression test\n4. Re-run the original test \u2014 it must now fail to exploit\n5. Review, deploy, and record closure with date + owner",
+      "explanation": "Step 4 is the one teams skip: without re-running the original test, you have a change, not a verified fix."
+    }
+  ],
+  "related_cwe_ids": [
+    "CWE-20",
+    "CWE-89",
+    "CWE-79",
+    "CWE-862"
+  ],
+  "knowledge_check": [
+    {
+      "question": "A critical-severity bug sits in an unused internal tool, and a medium bug sits on the public login page. Which do you fix first?",
+      "options": [
+        "Usually the medium bug on the public login page \u2014 it is reachable and exploitable",
+        "Always the critical one, scores decide everything",
+        "Neither \u2014 wait for the next release",
+        "The one with the shorter CVE ID"
+      ],
+      "answer_index": 0,
+      "explanation": "Severity scores do not include your exposure. Reachability, exploitability and data at risk decide real priority."
+    },
+    {
+      "question": "Why add a regression test as part of a fix?",
+      "options": [
+        "So the bug is caught automatically if it ever comes back",
+        "To make the fix slower",
+        "To replace code review",
+        "Because tests are required for the CVE to close"
+      ],
+      "answer_index": 0,
+      "explanation": "Without a regression test, a later refactor can silently reintroduce the same weakness and nobody notices until the next incident."
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "slug": "auth_weaknesses",
+  "title": "Identification and Authentication Failures",
+  "levels": {
+    "beginner": "Login is the front door. Authentication failures happen when the door can be opened without the right key: weak passwords allowed, no limit on guesses, sessions that never expire, or password-reset links that can be guessed.",
+    "intermediate": "Common patterns: credential stuffing against logins with no rate limiting, weak password policies, session tokens that are predictable or never invalidated after logout or password change, and multi-factor authentication missing on privileged accounts.",
+    "advanced": "Defend in layers: strong, breached-password-checked credentials; rate limiting and lockout with care for denial-of-service; random, expiring, revocable session tokens stored hashed server-side; MFA for admin and sensitive actions; and a password-reset flow whose tokens are random, single-use and short-lived."
+  },
+  "key_points": [
+    "Allow long passphrases; check new passwords against known breach lists.",
+    "Rate-limit login attempts per account and per IP; log failures.",
+    "Session tokens must be random, expire, and be revocable on logout and password change.",
+    "Require MFA for privileged accounts and sensitive actions.",
+    "Password-reset tokens: random, single-use, short-lived, sent only to the registered address."
+  ],
+  "defensive_examples": [
+    {
+      "title": "Store only a strong hash, never the password",
+      "language": "python",
+      "code": "from argon2 import PasswordHasher\nph = PasswordHasher()\nstored = ph.hash(plain_password)   # store `stored`, never the password\nph.verify(stored, plain_password)  # raises on mismatch",
+      "explanation": "Argon2id is a memory-hard hash designed for passwords. If the database leaks, attackers still face a slow, expensive guess for every password."
+    },
+    {
+      "title": "Session cookie flags (defensive configuration)",
+      "language": "text",
+      "code": "Set-Cookie: session=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800",
+      "explanation": "HttpOnly keeps scripts from reading the token, Secure sends it only over HTTPS, and SameSite=Lax limits cross-site sending."
+    }
+  ],
+  "related_cwe_ids": [
+    "CWE-307",
+    "CWE-798",
+    "CWE-384",
+    "CWE-521"
+  ],
+  "knowledge_check": [
+    {
+      "question": "An attacker tries thousands of passwords against one account and the app never slows them down. Which weakness is this?",
+      "options": [
+        "Missing rate limiting / improper restriction of authentication attempts",
+        "Cross-site scripting",
+        "SQL injection",
+        "Insecure deserialisation"
+      ],
+      "answer_index": 0,
+      "explanation": "Unlimited guesses make brute force and credential stuffing practical. Rate limiting and lockout are the standard countermeasures."
+    },
+    {
+      "question": "After a user changes their password, what should happen to their other active sessions?",
+      "options": [
+        "They should be revoked, forcing re-login",
+        "Nothing \u2014 they stay valid forever",
+        "They should be made admin sessions",
+        "They should be shared with the user by email"
+      ],
+      "answer_index": 0,
+      "explanation": "A password change usually means the account may be compromised, so other sessions must be invalidated."
+    }
+  ]
+}

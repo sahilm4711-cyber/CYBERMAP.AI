@@ -1,0 +1,60 @@
+{
+  "slug": "crypto_failures",
+  "title": "Cryptographic Failures",
+  "levels": {
+    "beginner": "Cryptography fails most often not because the maths is broken, but because it is used wrongly: passwords stored in plain text, sensitive data sent without TLS, old algorithms kept running, or keys left in source code.",
+    "intermediate": "Watch for: data in transit without TLS, sensitive data at rest unencrypted, weak or outdated algorithms (MD5/SHA-1 for passwords, DES, RC4), hard-coded keys and secrets, and random numbers from a non-cryptographic generator used for tokens.",
+    "advanced": "Rules that cover most cases: TLS everywhere with modern configuration; encrypt sensitive data at rest with a managed key; hash passwords with Argon2id/bcrypt/scrypt; use a vetted library and a cryptographic random generator for tokens and keys; rotate keys and never commit them."
+  },
+  "key_points": [
+    "TLS for all traffic; no sensitive data over plain HTTP.",
+    "Hash passwords with a purpose-built password hash (Argon2id), never MD5/SHA-1.",
+    "Use a vetted crypto library; do not design your own cipher or protocol.",
+    "Keys and secrets live in a vault or environment, never in code or git.",
+    "Use a cryptographic random source for tokens, salts and keys."
+  ],
+  "defensive_examples": [
+    {
+      "title": "Cryptographically secure random token",
+      "language": "python",
+      "code": "import secrets\ntoken = secrets.token_urlsafe(32)  # random, URL-safe, suitable for session/reset tokens",
+      "explanation": "The secrets module uses the operating system's secure random source. The random module is for simulations, not security tokens."
+    },
+    {
+      "title": "Password hashing, not encryption",
+      "language": "python",
+      "code": "# Passwords are HASHED (one-way) with Argon2id, not encrypted.\n# Encryption is reversible with a key; a hash cannot be reversed,\n# so a database leak does not hand attackers the passwords.",
+      "explanation": "Hashing is the right tool for passwords because the server never needs to recover the original password \u2014 it only needs to check a guess."
+    }
+  ],
+  "related_cwe_ids": [
+    "CWE-798",
+    "CWE-327",
+    "CWE-338",
+    "CWE-311"
+  ],
+  "knowledge_check": [
+    {
+      "question": "Which is the correct way to store user passwords?",
+      "options": [
+        "Hash with Argon2id/bcrypt/scrypt",
+        "Store in plain text for recovery",
+        "Encrypt with a key in the same database",
+        "Hash with MD5"
+      ],
+      "answer_index": 0,
+      "explanation": "A memory-hard password hash is one-way and slow to guess. Plain text, reversible encryption and fast hashes like MD5 all fail when the database leaks."
+    },
+    {
+      "question": "Why should session tokens come from a cryptographic random source?",
+      "options": [
+        "So they cannot be predicted or guessed by an attacker",
+        "So they are shorter",
+        "So they work offline",
+        "So they never expire"
+      ],
+      "answer_index": 0,
+      "explanation": "Predictable tokens let an attacker forge a session. A secure random source makes guessing infeasible."
+    }
+  ]
+}

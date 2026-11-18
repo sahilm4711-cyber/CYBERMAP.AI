@@ -1,0 +1,60 @@
+{
+  "slug": "secure_coding",
+  "title": "Secure Coding \u2014 Habits That Prevent Whole Bug Classes",
+  "levels": {
+    "beginner": "Secure coding is mostly habit, not cleverness: never trust input from outside your code, fail closed when something is unexpected, and use the safe tool the framework already gives you instead of building your own.",
+    "intermediate": "The highest-value habits are: validate and encode at boundaries, use parameterised queries, keep secrets out of code, handle errors without leaking internals, and write the smallest amount of privileged code you can. Each habit removes a whole class of bugs rather than one bug.",
+    "advanced": "Treat security as a property of the design: define trust boundaries, decide what each component is allowed to do, and make the unsafe path the hard path (safe defaults, allow-lists, typed APIs). Review for the pattern, not the incident \u2014 and automate the check (linters, dependency scans, tests) so the habit survives deadlines."
+  },
+  "key_points": [
+    "Validate input at the boundary; encode output for its context.",
+    "Use parameterised queries \u2014 never build SQL from string concatenation.",
+    "Fail closed: when in doubt, deny and log, do not allow.",
+    "Never hard-code secrets; load them from a vault or environment.",
+    "Keep error messages generic for users and detailed only in server logs."
+  ],
+  "defensive_examples": [
+    {
+      "title": "Parameterised query (safe) vs string building (unsafe)",
+      "language": "python",
+      "code": "# SAFE: the database treats the value as data, never as SQL.\ncur.execute(\"SELECT * FROM users WHERE username = %s\", (username,))\n\n# UNSAFE \u2014 do not do this:\n# cur.execute(f\"SELECT * FROM users WHERE username = '{username}'\")",
+      "explanation": "Parameterisation separates code from data. The unsafe version lets input rewrite the query itself."
+    },
+    {
+      "title": "Output encoding for HTML context",
+      "language": "python",
+      "code": "import html\nsafe = html.escape(user_comment)  # < becomes &lt; and so on",
+      "explanation": "Encoding at output time means user text is displayed as text, never interpreted as markup or script."
+    }
+  ],
+  "related_cwe_ids": [
+    "CWE-89",
+    "CWE-79",
+    "CWE-20",
+    "CWE-798"
+  ],
+  "knowledge_check": [
+    {
+      "question": "Why is a parameterised query safer than building SQL with string concatenation?",
+      "options": [
+        "The database treats the value as data, never as SQL code",
+        "It runs faster",
+        "It hides the table name",
+        "It encrypts the value"
+      ],
+      "answer_index": 0,
+      "explanation": "With parameters, user input can never change the structure of the query \u2014 it stays data, so injection is not possible through that path."
+    },
+    {
+      "question": "What does 'fail closed' mean?",
+      "options": [
+        "When something is unexpected, deny access and log it",
+        "Close the application on every error",
+        "Hide all errors from everyone",
+        "Allow access but warn the user"
+      ],
+      "answer_index": 0,
+      "explanation": "Failing closed means the default outcome of an error or ambiguity is denial, not access."
+    }
+  ]
+}

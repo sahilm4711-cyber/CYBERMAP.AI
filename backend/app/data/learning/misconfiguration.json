@@ -1,0 +1,60 @@
+{
+  "slug": "misconfiguration",
+  "title": "Security Misconfiguration",
+  "levels": {
+    "beginner": "Misconfiguration is the 'left the door open' category: default passwords unchanged, admin panels exposed to the internet, debug mode on in production, error pages that reveal internals, or cloud storage buckets left public.",
+    "intermediate": "Typical causes: shipping with vendor defaults, enabling features nobody needs, verbose errors and stack traces in production, missing security headers, and infrastructure changed by hand instead of reviewed code.",
+    "advanced": "Counter it with a hardened baseline: change every default credential, disable what you do not use, keep production and development settings separate, return generic errors to users, set security headers, and review infrastructure changes like code changes."
+  },
+  "key_points": [
+    "Change all default credentials before first use.",
+    "Disable debug mode, directory listings and unused features in production.",
+    "Return generic errors to users; keep detail in server logs.",
+    "Set security headers (CSP, HSTS, X-Content-Type-Options, X-Frame-Options).",
+    "Define infrastructure as reviewed code, not manual clicks."
+  ],
+  "defensive_examples": [
+    {
+      "title": "Defensive security headers (example values)",
+      "language": "text",
+      "code": "Content-Security-Policy: default-src 'self'\nStrict-Transport-Security: max-age=31536000; includeSubDomains\nX-Content-Type-Options: nosniff\nX-Frame-Options: DENY\nReferrer-Policy: no-referrer",
+      "explanation": "Headers are cheap, central defences: they limit what the browser will load and execute, and stop the site being framed by another page."
+    },
+    {
+      "title": "Separate dev and production settings",
+      "language": "python",
+      "code": "# Production must never inherit development settings:\n# DEBUG = False in production; error pages generic;\n# secrets from the environment, never from a checked-in file.",
+      "explanation": "Most misconfigurations are a development setting that leaked into production. Make the two environments structurally different, not just a flag someone might forget."
+    }
+  ],
+  "related_cwe_ids": [
+    "CWE-1188",
+    "CWE-200",
+    "CWE-798",
+    "CWE-16"
+  ],
+  "knowledge_check": [
+    {
+      "question": "A production error page shows a full stack trace with file paths and database details. Which category is this?",
+      "options": [
+        "Security Misconfiguration (and information exposure)",
+        "Injection",
+        "Broken Access Control",
+        "SSRF"
+      ],
+      "answer_index": 0,
+      "explanation": "Verbose errors in production leak internals that help an attacker. Users get a generic message; detail stays in server logs."
+    },
+    {
+      "question": "What is the best first step against misconfiguration across many servers?",
+      "options": [
+        "A hardened, reviewed baseline applied everywhere, with drift checks",
+        "A different password on each server, remembered by staff",
+        "Disabling all logging",
+        "Leaving vendor defaults and patching later"
+      ],
+      "answer_index": 0,
+      "explanation": "A single reviewed baseline plus automated checks that detect drift beats fixing each server by hand after the fact."
+    }
+  ]
+}

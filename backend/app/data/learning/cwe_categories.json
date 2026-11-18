@@ -1,0 +1,53 @@
+{
+  "slug": "cwe_categories",
+  "title": "CWE Categories \u2014 How Weaknesses Are Classified",
+  "levels": {
+    "beginner": "CWE is a shared dictionary of software weaknesses. Instead of every team inventing its own names, everyone uses the same CWE numbers \u2014 CWE-79 always means the same kind of cross-site scripting weakness, wherever you read it.",
+    "intermediate": "CWEs are organised into views and categories (for example, improper input validation, improper access control, improper handling of sensitive data). A single CVE usually maps to one or more CWEs, which tells you the root cause class, not just the symptom.",
+    "advanced": "Use CWE mappings to prioritise remediation by weakness class: if ten CVEs in your stack all map to improper input validation, fixing validation centrally (a shared library, a framework feature) beats patching ten symptoms one by one. Track which CWE classes recur in your own code reviews."
+  },
+  "key_points": [
+    "One CVE can map to several CWEs; one CWE explains many CVEs.",
+    "CWE describes the weakness (root cause); CVE describes a specific instance in a product.",
+    "Categories group related CWEs so teams can spot patterns.",
+    "CWE IDs are stable references you can search in any vulnerability database."
+  ],
+  "defensive_examples": [
+    {
+      "title": "Looking up a weakness class in your own data",
+      "language": "python",
+      "code": "# In CyberMap AI, a CVE links to its CWEs through\n# vulnerability_relationships with relationship='HAS_WEAKNESS'.\n# Group your findings by CWE to find the recurring root cause.",
+      "explanation": "Grouping by CWE turns a long list of individual bugs into a short list of systemic problems to fix."
+    }
+  ],
+  "related_cwe_ids": [
+    "CWE-20",
+    "CWE-79",
+    "CWE-89",
+    "CWE-200"
+  ],
+  "knowledge_check": [
+    {
+      "question": "What is the difference between a CVE and a CWE?",
+      "options": [
+        "A CVE is a specific instance in a product; a CWE is the weakness class",
+        "They are the same thing",
+        "A CVE is a fix and a CWE is a bug",
+        "A CWE only applies to hardware"
+      ],
+      "answer_index": 0,
+      "explanation": "CVE-2024-12345 names one flaw in one product. CWE-79 names the whole class of cross-site scripting weaknesses that many CVEs share."
+    },
+    {
+      "question": "Why group findings by CWE category instead of fixing CVEs one by one?",
+      "options": [
+        "It reveals a recurring root cause you can fix once, centrally",
+        "It hides the real bugs",
+        "It is required by law everywhere",
+        "It makes the list longer"
+      ],
+      "answer_index": 0,
+      "explanation": "Ten CVEs sharing one CWE usually share one root cause. Fix the cause and the whole class shrinks."
+    }
+  ]
+}

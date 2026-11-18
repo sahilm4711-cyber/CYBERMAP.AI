@@ -1,0 +1,54 @@
+{
+  "slug": "access_control",
+  "title": "Broken Access Control",
+  "levels": {
+    "beginner": "Access control answers one question: is this user allowed to do this thing to this object? It breaks when the app forgets to ask \u2014 a normal user opening an admin page, or viewing someone else's record by changing an ID.",
+    "intermediate": "The classic patterns are insecure direct object references (predictable IDs with no ownership check), missing function-level checks (the button is hidden but the API endpoint is open), and privilege escalation through a parameter the user controls.",
+    "advanced": "Enforce authorisation on the server for every request, using the authenticated identity and the object's owner \u2014 never trust a hidden form field or a client-side check. Prefer deny-by-default: every endpoint starts closed and explicitly grants what a role may do. Test with two accounts: what user B can do to user A's data is the test that matters."
+  },
+  "key_points": [
+    "Check ownership on the server for every object access, not only in the UI.",
+    "Deny by default; grant explicitly per role and per action.",
+    "Never trust IDs, roles or permissions sent by the client.",
+    "Use unpredictable IDs where possible, but never rely on secrecy alone.",
+    "Audit access decisions \u2014 log denied attempts."
+  ],
+  "defensive_examples": [
+    {
+      "title": "Ownership check on the server (pattern)",
+      "language": "python",
+      "code": "# Every single-object read must do this:\nobj = db.query(Note).filter(Note.id == note_id).first()\nif obj is None or obj.user_id != current_user.id:\n    raise HTTPException(404, \"Not found\")  # 404, not 403: do not leak existence",
+      "explanation": "Returning 404 for another user's object hides whether it exists at all, and the check happens server-side where the client cannot bypass it."
+    }
+  ],
+  "related_cwe_ids": [
+    "CWE-862",
+    "CWE-863",
+    "CWE-639",
+    "CWE-284"
+  ],
+  "knowledge_check": [
+    {
+      "question": "A page hides the 'Delete' button from normal users, but the delete API endpoint works without any role check. What is wrong?",
+      "options": [
+        "Authorisation must be enforced on the server; hiding UI is not a control",
+        "The button should be bigger",
+        "The API needs a faster database",
+        "Nothing \u2014 users cannot find hidden buttons"
+      ],
+      "answer_index": 0,
+      "explanation": "Anyone can call an API directly. The server must check the caller's role on every request, regardless of what the UI shows."
+    },
+    {
+      "question": "Why return 404 instead of 403 when a user requests another user's private object?",
+      "options": [
+        "So an attacker cannot learn whether the object exists",
+        "Because 403 is slower",
+        "Because 404 is the only valid code",
+        "To confuse legitimate users"
+      ],
+      "answer_index": 0,
+      "explanation": "A 403 confirms the object exists but is forbidden; a 404 reveals nothing, which prevents probing for other users' data."
+    }
+  ]
+}

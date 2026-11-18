@@ -1,0 +1,66 @@
+{
+  "slug": "owasp_top_10",
+  "title": "OWASP Top 10 (2021) \u2014 The Ten Most Common Web Risks",
+  "levels": {
+    "beginner": "Think of a web app as a house. The OWASP Top 10 is a list of the ten ways burglars most often get in: unlocked doors, weak locks, hidden spare keys, and so on. You do not need to memorise every detail yet \u2014 just learn what each risk is called and why it matters.",
+    "intermediate": "Each of the ten categories names a class of weakness, not a single bug. For every category you should be able to say: what the attacker gains, what code pattern causes it, and what the standard defence is. The categories overlap \u2014 one real vulnerability often fits two of them.",
+    "advanced": "Use the Top 10 as a review checklist and a threat-model input, not as a complete security standard. It ranks common, high-impact risks in typical web apps; your own app may have risks the list does not cover (business-logic abuse, for example). Map each category to concrete controls in your codebase and to tests that prove the controls work."
+  },
+  "key_points": [
+    "Broken Access Control \u2014 users reaching data or actions they should not.",
+    "Cryptographic Failures \u2014 sensitive data exposed because it is not protected properly.",
+    "Injection \u2014 untrusted input treated as code or commands.",
+    "Insecure Design \u2014 security missing from the design itself, not just the code.",
+    "Security Misconfiguration \u2014 unsafe defaults, open admin panels, verbose errors.",
+    "Vulnerable and Outdated Components \u2014 known-buggy libraries left in place.",
+    "Identification and Authentication Failures \u2014 weak or broken login and session handling.",
+    "Software and Data Integrity Failures \u2014 trusting updates, plugins or data that were tampered with.",
+    "Security Logging and Monitoring Failures \u2014 attacks happening unnoticed.",
+    "Server-Side Request Forgery (SSRF) \u2014 the server tricked into making requests on the attacker's behalf."
+  ],
+  "defensive_examples": [
+    {
+      "title": "Defence in depth, not one magic fix",
+      "language": "text",
+      "code": "Design review -> threat model -> secure defaults -> input validation -> least privilege -> logging -> tests -> patching",
+      "explanation": "Each category is countered by a different layer. A checklist reviewed at design time catches more than a scanner run at the end."
+    },
+    {
+      "title": "Keep an inventory of your components",
+      "language": "bash",
+      "code": "# List installed packages and check them against known issues\npip list\nnpm audit\n# Pin versions and update on a schedule, not only after an incident",
+      "explanation": "You cannot patch a library you do not know you use. An inventory plus a regular update routine addresses the outdated-components category."
+    }
+  ],
+  "related_cwe_ids": [
+    "CWE-862",
+    "CWE-863",
+    "CWE-89",
+    "CWE-79",
+    "CWE-798"
+  ],
+  "knowledge_check": [
+    {
+      "question": "Which OWASP Top 10 category covers a normal user viewing another user's private records by changing an ID in a URL?",
+      "options": [
+        "Injection",
+        "Broken Access Control",
+        "Cryptographic Failures",
+        "Security Misconfiguration"
+      ],
+      "answer_index": 1,
+      "explanation": "Changing an ID to reach someone else's data is an access-control failure: the app never checked whether this user was allowed to see that record."
+    },
+    {
+      "question": "Why is the OWASP Top 10 a starting point rather than a complete security standard?",
+      "options": [
+        "It only lists the ten most common high-impact web risks",
+        "It is only about mobile apps",
+        "It replaces all penetration testing",
+        "It only applies to banks"
+      ],
+      "answer_index": 0,
+      "explanation": "It ranks common risks in typical web apps. Your app can still have business-logic or platform-specific risks the list does not describe."
+    }
+  ]
+}

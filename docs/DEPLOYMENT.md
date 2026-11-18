@@ -1,15 +1,17 @@
 # CyberMap AI — Deployment Guide (Vercel + Render)
 
-> **Status:** configs prepared 2026-11-18. **Not yet deployed.** This
-> guide is the deploy runbook for the setup the project owner chose:
-> frontend on Vercel, backend + Postgres on Render — the same split
-> as Curion. The three deploy files are `vercel.json`, `render.yaml`
-> (both at the repo root) and this guide.
+> **Status:** configs prepared 2026-11-18, rewired 2026-11-18 for a
+> free Supabase database. **Not yet deployed.** This guide is the
+> deploy runbook for the setup the project owner chose: frontend on
+> Vercel, backend on Render, Postgres on Supabase (free tier) — the
+> same split as Curion, except the database is Supabase free instead
+> of Render's paid Postgres. The three deploy files are `vercel.json`,
+> `render.yaml` (both at the repo root) and this guide.
 >
 > ⚠️ **Do not skip §1.** Two real bugs were found while preparing
 > these configs; the workarounds are baked into `render.yaml`, and
-> one pre-deploy code change (§1.3) is still required before the
-> site can be public.
+> §1.9 (Supabase setup) must be done before the first Render deploy.
+> The pre-deploy code changes are already applied (§1.1, §1.3).
 
 ## Architecture
 
@@ -22,9 +24,9 @@ Vercel — Next.js 16 frontend (static + SSR)
     │  NEXT_PUBLIC_API_URL = https://cybermap-ai-backend.onrender.com
     ▼
 Render — FastAPI backend (uvicorn, 1 instance)
-    │  DATABASE_URL (Postgres + pgvector)
+    │  DATABASE_URL (Supabase direct connection, port 5432)
     ▼
-Render — managed PostgreSQL 16 + pgvector (cybermap-db)
+Supabase — managed PostgreSQL + pgvector (free tier, 500 MB)
 ```
 
 The frontend and backend are on **different sites** (`vercel.app`
@@ -35,27 +37,21 @@ Vercel URL (§1.5). Get either wrong and login silently breaks.
 
 ## 1. Pre-deploy blockers — read before touching any dashboard
 
-### 1.1 Postgres driver missing from `requirements.txt` (verified)
+### 1.1 Postgres driver — RESOLVED (was missing from `requirements.txt`)
 
-`backend/requirements.txt` contains **no Postgres driver**
-(`psycopg2` / `psycopg`). Verified locally in the project venv —
-every URL form fails:
-
-- `postgresql+psycopg2://…` → `ModuleNotFoundError: No module named 'psycopg2'`
-- `postgresql+psycopg://…` → `ModuleNotFoundError: No module named 'psycopg'`
-- `postgresql://…` → same `psycopg2` error (it is the default driver)
-
-So the backend **cannot connect to Postgres as written** — not on
-Render, not in Docker Compose either (the Docker path has the same
-hole). Workaround already in `render.yaml`: the build command
-installs `psycopg[binary]==3.2.10` alongside `requirements.txt`.
-**Durable fix (do this):** add `psycopg[binary]==3.2.10` to
-`backend/requirements.txt` and then drop the extra install from the
-build command.
+`backend/requirements.txt` used to contain **no Postgres driver**
+(`psycopg2` / `psycopg`) — verified locally in the project venv,
+every URL form failed with `ModuleNotFoundError`, so the backend
+could not connect to Postgres as written. **Fixed 2026-11-18:**
+`psycopg[binary]==3.2.10` was added to `backend/requirements.txt`
+and the full backend test suite still passes (197 tests, 0 failed).
+No action needed — `render.yaml` installs the driver from
+`requirements.txt` at build time.
 
 ### 1.2 Render's `DATABASE_URL` scheme is rejected by SQLAlchemy 2.0 (verified)
 
-Render issues connection strings as `postgres://user:pass@host/db`.
+Supabase issues connection strings as `postgres://user:pass@host:5432/db`
+(direct connection; see §1.9).
 SQLAlchemy 2.0 removed the `postgres://` alias — verified locally:
 
 - `postgres://…` → `NoSuchModuleError: Can't load plugin: sqlalchemy.dialects:postgres`
@@ -67,27 +63,18 @@ uvicorn (a no-op if the URL already has the right scheme).
 `backend/app/core/config.py` when `database_url` is loaded, e.g.
 `if url.startswith("postgres://"): url = "postgresql+psycopg://" + url[len("postgres://"):]`.
 
-### 1.3 `/docs`, `/redoc`, `/openapi.json` are public — CODE CHANGE REQUIRED
+### 1.3 `/docs`, `/redoc`, `/openapi.json` — RESOLVED (was public)
 
-`backend/app/main.py` sets `docs_url="/docs"` unconditionally; no
-environment flag gates it. `ENVIRONMENT=production` (already set in
-`render.yaml`) changes nothing on its own. This is residual risk R4
-in `docs/SECURITY.md`. **Before the site is public, apply this
-change** (or keep the deployment link private until it is applied):
-
-```python
-# backend/app/main.py — inside create_app(), replace the FastAPI(...)
-# call's docs arguments with:
-docs_url="/docs" if settings.environment != "production" else None,
-redoc_url="/redoc" if settings.environment != "production" else None,
-openapi_url="/openapi.json" if settings.environment != "production" else None,
-```
-
-(`openapi_url=None` matters too — disabling only `docs_url` still
-leaves the raw `/openapi.json` map public.) After the change, commit,
-push, and Render redeploys automatically. Verify with
+`backend/app/main.py` used to set `docs_url="/docs"` unconditionally;
+no environment flag gated it. This was residual risk R4 in
+`docs/SECURITY.md`. **Fixed 2026-11-18 (commit 55d3cdb):** the docs
+are now environment-gated — `docs_url`, `redoc_url` and `openapi_url`
+are all `None` when `ENVIRONMENT=production` (verified: `GET /docs`
+→ 404 in production mode, still available in local development).
+No action needed — `render.yaml` already sets
+`ENVIRONMENT=production`. Verify live with
 `curl -s -o /dev/null -w "%{http_code}" https://<backend>/docs`
-— expect **404** in production.
+— expect **404**.
 
 ### 1.4 Cross-site session cookie (why login would silently fail)
 
@@ -110,7 +97,7 @@ POST/PUT/PATCH/DELETE whose `Origin` header is not in the CORS
 allow-list — that includes **login and register**. So while
 `CORS_ORIGINS` still holds the placeholder
 `https://YOUR-VERCEL-APP.vercel.app`, login returns **403**.
-Set it to the real Vercel origin (no trailing slash) in Step 4.
+Set it to the real Vercel origin (no trailing slash) in Step 5.
 
 ### 1.6 One backend instance only
 
@@ -129,17 +116,60 @@ in-memory, ingestion state lives in the `ingestion_jobs` table.
 Do not pay for a service nothing reads. Add one only when a future
 phase actually uses it (and then wire `REDIS_URL`).
 
-### 1.8 Cost (approximate — verify at render.com/pricing)
+### 1.8 Cost — $0 total
 
 | Piece | Plan in these configs | Approx. cost |
 |---|---|---|
 | Render web service | `free` (spins down after ~15 min idle; first request after sleep is slow) | $0 |
-| Render Postgres | `basic-256mb` (cheapest always-on; the free tier expires after 30 days) | ~$6/mo + ~$0.30/GB/mo storage |
+| Supabase Postgres | Free tier (500 MB database, pgvector included; pauses after 1 week idle — §1.9) | $0 |
 | Vercel frontend | Hobby | $0 |
-| **Total, always-on backend** | Starter web service (~$7/mo) + Basic-256mb Postgres | **~$13/mo + storage** |
+| **Total** | | **$0** |
 
 Switch the web service to `plan: starter` in `render.yaml` (or in
-the dashboard) if cold starts are unacceptable.
+the dashboard, ~$7/month) if cold starts are unacceptable.
+
+### 1.9 Supabase database (free tier) — do this first
+
+The database lives on Supabase, not on Render. `render.yaml` has no
+`databases:` section; the backend reads the connection string from
+the `DATABASE_URL` environment variable, which you set by hand in
+the Render dashboard (it is `sync: false` in `render.yaml`).
+
+1. **Create the project.** Supabase dashboard → **New project** →
+   pick the Free plan ($0 — 500 MB database, 2 free projects, no
+   credit card). The owner already has a Supabase account from
+   Curion, so use that account.
+2. **Copy the DIRECT connection string.** Project Settings →
+   **Database** → **Connection string** → **URI**. Use the direct
+   connection (`db.<ref>.supabase.co`, **port 5432**) — NOT the
+   pooler (`pooler.supabase.com`, port 6543). The pooler runs in
+   PgBouncer transaction mode, which can break SQLAlchemy/psycopg
+   prepared statements; the direct connection avoids that entirely.
+   The URI looks like
+   `postgres://postgres:<password>@db.<ref>.supabase.co:5432/postgres`
+   (Supabase shows it with the `postgres://` scheme; the
+   startCommand rewrite in `render.yaml` handles that — see §1.2).
+3. **Paste it into Render.** Render dashboard → `cybermap-ai-backend`
+   → **Environment** → set `DATABASE_URL` to that URI. Do this
+   **before the first successful build** — the build runs Alembic,
+   and the migration fails if the database is unreachable (see
+   Step 2).
+4. **SSL.** Supabase requires SSL. psycopg3 negotiates SSL by
+   default (`sslmode=prefer`), so the plain URI usually connects
+   fine. If the first deploy fails to connect, append
+   `?sslmode=require` to the URI in the Render dashboard and
+   redeploy.
+5. **Vector extension.** Migration `0001_initial` already runs
+   `CREATE EXTENSION IF NOT EXISTS vector` (Postgres only — it is
+   guarded by a dialect check), and Supabase supports the `vector`
+   extension. No manual step should be needed. If the migration
+   fails on the extension, run `CREATE EXTENSION vector;` once in
+   the Supabase **SQL Editor** and redeploy.
+6. **Pause rule.** Free-tier projects pause after **1 week of
+   inactivity** and are resumed from the Supabase dashboard. The
+   first visit after a pause fails (backend reports
+   `database: "error"` on `/health`) until the project is resumed.
+   Resume it before demoing the site if it has been idle.
 
 ## 2. Environment variables
 
@@ -150,10 +180,10 @@ rows, which you set in the dashboard (leave empty for fallback mode).
 
 | Variable | Value | Notes |
 |---|---|---|
-| `ENVIRONMENT` | `production` | Drives the §1.3 docs gate once applied |
+| `ENVIRONMENT` | `production` | Drives the §1.3 docs gate (applied — `/docs` is 404 in production) |
 | `SECRET_KEY` | *(generated by Render)* | Session signing. Never commit a value |
-| `DATABASE_URL` | *(from `cybermap-db`)* | Scheme rewritten at start (§1.2) |
-| `CORS_ORIGINS` | `https://YOUR-VERCEL-APP.vercel.app` → **replace with the real Vercel URL in Step 4** | Exact origin, no trailing slash (§1.5) |
+| `DATABASE_URL` | *(set in dashboard — Supabase direct connection string, §1.9)* | Scheme rewritten at start (§1.2); `sync: false` in render.yaml |
+| `CORS_ORIGINS` | `https://YOUR-VERCEL-APP.vercel.app` → **replace with the real Vercel URL in Step 5** | Exact origin, no trailing slash (§1.5) |
 | `SESSION_COOKIE_SECURE` | `true` | §1.4 |
 | `SESSION_COOKIE_SAMESITE` | `none` | §1.4 |
 | `AI_PROVIDER` / `AI_MODEL` | *(empty)* | Empty = non-AI fallback (verified) |
@@ -176,29 +206,32 @@ git commit -m "Add Vercel + Render deployment configs"
 git push origin main
 ```
 
-(And apply the §1.3 docs-gating code change in the same push if it
-is ready — otherwise do it before announcing the site publicly.)
+(The §1.3 docs-gating change is already applied and pushed.)
 
-### Step 1 — Render: create the Blueprint
+### Step 1 — Supabase: create the project (do this first)
+
+Follow §1.9: create the free project, copy the DIRECT connection
+string (port 5432, not the pooler). Keep it ready for Step 2.
+
+### Step 2 — Render: create the Blueprint
 
 1. Render dashboard → **New → Blueprint** → select the
    `sahilm4711-cyber/CYBERMAP.AI` repo.
-2. Render shows two resources from `render.yaml`:
-   `cybermap-ai-backend` (web service) and `cybermap-db` (Postgres).
-   Confirm the database plan is `basic-256mb` and apply.
-3. Watch the first build log. It must show `pip install` succeeding
+2. Render shows one resource from `render.yaml`:
+   `cybermap-ai-backend` (web service). There is no Render
+   database — the database lives on Supabase (§1.9). Apply.
+3. **Set `DATABASE_URL` now**, in the service's **Environment**
+   tab, to the Supabase direct connection string from Step 1. The
+   first build runs Alembic, and it fails if the database is
+   unreachable — if the build already failed, set the variable and
+   use **Manual Deploy → Deploy latest commit** to rebuild.
+4. Watch the build log. It must show `pip install` succeeding
    and then Alembic running migration `0001_initial` — that
    migration runs `CREATE EXTENSION IF NOT EXISTS vector`
-   (pgvector is available on Render Postgres but not enabled by
-   default; the migration enables it). If the migration fails on
-   the extension, open the database's psql shell in the Render
-   dashboard, run `CREATE EXTENSION vector;` once, and redeploy.
-4. If the build fails at the Alembic step with a connection error,
-   wait until the database shows **Available**, then **Manual
-   Deploy → Deploy latest commit** — the database is created just
-   before the service builds on the first Blueprint apply.
+   (Supabase supports the `vector` extension; see §1.9 step 5 if
+   it fails).
 
-### Step 2 — Verify the backend
+### Step 3 — Verify the backend
 
 ```bash
 BACKEND=https://cybermap-ai-backend.onrender.com
@@ -207,7 +240,7 @@ curl -s $BACKEND/health
 curl -s $BACKEND/
 # expect: {"service":"cybermap-ai", "version":"0.1.0", ...}
 curl -s -o /dev/null -w "%{http_code}\n" $BACKEND/docs
-# expect: 404 once §1.3 is applied (200 before that — not yet gated)
+# expect: 404 (§1.3 is already applied)
 ```
 
 `database: "error"` here means the backend is up but cannot reach
@@ -215,7 +248,7 @@ Postgres — check the logs for the driver/scheme issues in §1.1–1.2.
 On the free web-service plan the first request after idle takes
 ~30–60 s (cold start); that is normal, not an error.
 
-### Step 3 — Vercel: deploy the frontend
+### Step 4 — Vercel: deploy the frontend
 
 1. Vercel dashboard → **Add New → Project** → import
    `sahilm4711-cyber/CYBERMAP.AI`.
@@ -231,7 +264,7 @@ On the free web-service plan the first request after idle takes
    should show the "no intelligence data yet" empty state (the live
    database starts empty — that is expected, not a bug).
 
-### Step 4 — Point the backend at the real frontend URL
+### Step 5 — Point the backend at the real frontend URL
 
 1. In Render, open `cybermap-ai-backend` → **Environment** → set
    `CORS_ORIGINS` to the exact Vercel origin, e.g.
@@ -243,7 +276,7 @@ On the free web-service plan the first request after idle takes
    `CORS_ORIGINS` is wrong (§1.5). If login succeeds but the next
    page acts logged-out, the cookie settings are wrong (§1.4).
 
-### Step 5 — Fill the database (admin ingestion)
+### Step 6 — Fill the database (admin ingestion)
 
 Registration always creates role `user`; ingestion endpoints are
 admin-only. Promote the first user, then sync each source once
@@ -251,7 +284,7 @@ admin-only. Promote the first user, then sync each source once
 local use):
 
 ```bash
-# 1. In the Render dashboard, open the cybermap-db psql shell:
+# 1. In Supabase, open the SQL Editor:
 UPDATE users SET role_id = (SELECT id FROM roles WHERE name='admin')
 WHERE username = '<your-username>';
 # 2. Log out and log back in so the new role takes effect.
@@ -288,16 +321,18 @@ only and needs re-creating with fresh usernames per run).
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Build fails: `No module named 'psycopg2'` / `'psycopg'` | Driver not installed | Check the build log shows the `psycopg[binary]==3.2.10` install; durable fix is §1.1 |
+| Build fails: `No module named 'psycopg2'` / `'psycopg'` | Driver not installed | §1.1 is already fixed (driver is in `requirements.txt`) — check the build log shows the install succeeding |
 | Build fails: `Can't load plugin: sqlalchemy.dialects:postgres` | `DATABASE_URL` still `postgres://` | The startCommand rewrite (§1.2) should handle it — check the command wasn't edited; or set `DATABASE_URL` manually in the dashboard as `postgresql+psycopg://…` |
-| `/health` says `database: "error"` | DB unreachable or migration not run | Check the service logs; confirm the database is **Available**; redeploy so Alembic re-runs |
-| Migration fails on `CREATE EXTENSION vector` | Extension not allow-listed for this DB | Run `CREATE EXTENSION vector;` once in the dashboard psql shell, then redeploy |
-| Login/register return 403 | `CORS_ORIGINS` is not the Vercel origin | Step 4 — exact origin, no trailing slash |
+| Build fails at Alembic: could not connect | `DATABASE_URL` not set yet | Set it in the Render dashboard (Step 2 step 3), then Manual Deploy → Deploy latest commit |
+| `/health` says `database: "error"` | DB unreachable, `DATABASE_URL` unset, or Supabase project paused | Check the service logs; confirm `DATABASE_URL` is set in the Render dashboard (§1.9 step 3) and the Supabase project is not paused (§1.9 step 6); redeploy so Alembic re-runs |
+| Migration fails on `CREATE EXTENSION vector` | Extension not enabled | Run `CREATE EXTENSION vector;` once in the Supabase SQL Editor, then redeploy (§1.9 step 5) |
+| Site worked, now connection errors after ~a week idle | Supabase free-tier pause | Resume the project in the Supabase dashboard (§1.9 step 6) |
+| Login/register return 403 | `CORS_ORIGINS` is not the Vercel origin | Step 5 — exact origin, no trailing slash |
 | Login 200, then immediately logged out | Cookie `SameSite`/`Secure` wrong | §1.4 — must be `none` + `true` on this split-domain setup |
 | Frontend shows "backend unreachable" | `NEXT_PUBLIC_API_URL` wrong or stale | It is baked at build time — fix the env var in Vercel and **redeploy** |
 | First request very slow / 502 | Free-tier cold start | Normal on the free plan (~30–60 s). Use the Starter plan to stay warm |
-| Dashboard empty after deploy | Fresh DB, no ingestion yet | Step 5 |
-| CI checks failing on GitHub (0/2) | Pre-existing: the CI workflow fails on the repo | Unrelated to deploy, but check the workflow run — do not ignore failing checks on a public repo |
+| Dashboard empty after deploy | Fresh DB, no ingestion yet | Step 6 |
+| CI checks failing on GitHub | Stale runs from before the code was pushed | CI is green as of run #6 (commit 55d3cdb, both jobs passed) — the old 0/2 failures were from a commit before `backend/` and `frontend/` existed in the repo |
 
 ## 6. Rollback
 
@@ -308,5 +343,6 @@ only and needs re-creating with fresh usernames per run).
   `git revert` the breaking commit and push (Render auto-deploys).
 - **Database:** Alembic downgrade is available
   (`alembic downgrade -1` from `backend/`), but do not run it
-  against live data without a backup — Render keeps automatic
-  backups per its Postgres plan.
+  against live data without a backup — the Supabase free tier has
+  no automatic backups, so export first (`pg_dump` with the
+  Supabase connection string).

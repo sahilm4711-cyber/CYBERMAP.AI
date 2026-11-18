@@ -9,6 +9,7 @@ API docs (when running): http://localhost:8000/docs
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1 import (
     ai,
@@ -23,6 +24,27 @@ from app.api.v1 import (
     vulnerabilities,
 )
 from app.core.config import settings
+
+# SECURITY: response headers every backend reply carries. This is the
+# API, so no CSP here — a JSON API has nothing to frame or run inline,
+# and a strict CSP would break the dev-only Swagger UI. The four headers
+# below are the ones that matter for an API: no framing (clickjacking),
+# no MIME sniffing, a strict referrer, and no browser features.
+SECURITY_HEADERS = {
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Set the security headers on every response, including errors."""
+
+    async def dispatch(self, request, call_next):  # type: ignore[no-untyped-def]
+        response = await call_next(request)
+        response.headers.update(SECURITY_HEADERS)
+        return response
 
 
 def create_app() -> FastAPI:
@@ -54,6 +76,10 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
+
+    # Added after CORS so it wraps every response, including the
+    # preflight replies CORS itself returns early.
+    app.add_middleware(SecurityHeadersMiddleware)
 
     app.include_router(health.router)
     app.include_router(auth.router)

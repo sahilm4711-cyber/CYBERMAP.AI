@@ -47,14 +47,8 @@ export default async function Home() {
           never display fabricated live statistics.
         </p>
         <p className="mt-3 text-sm text-zinc-500">
-          What works now: backend health endpoints, API docs at{" "}
-          <a
-            className="text-cyan-400 underline"
-            href="http://localhost:8000/docs"
-          >
-            localhost:8000/docs
-          </a>
-          , and this live status check above.
+          What works now: backend health endpoints (live status check
+          above). The interactive API docs are disabled in production.
         </p>
       </section>
 

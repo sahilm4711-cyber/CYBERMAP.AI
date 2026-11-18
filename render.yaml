@@ -54,12 +54,11 @@ services:
       # Never put the real value in this file.
       - key: DATABASE_URL
         sync: false
-      # MUST be replaced with the real Vercel URL after the first
-      # frontend deploy (e.g. https://cybermap-ai.vercel.app) — no
-      # trailing slash. Login/register return 403 while this is wrong
-      # (the CSRF check compares Origin against this list).
+      # Real Vercel URL (set 2026-11-18 after the first frontend deploy)
+      # — no trailing slash. Login/register return 403 while this is
+      # wrong (the CSRF check compares Origin against this list).
       - key: CORS_ORIGINS
-        value: https://YOUR-VERCEL-APP.vercel.app
+        value: https://cybermapai.vercel.app
       # Required: the frontend is on a different site (vercel.app) from
       # the backend (onrender.com), and the frontend sends
       # credentials: "include". SameSite=Lax would silently drop the

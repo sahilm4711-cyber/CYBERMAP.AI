@@ -1,0 +1,76 @@
+# CyberMap AI — local development stack.
+# Usage: cp .env.example .env  (then fill in your own values) && docker compose up --build
+# NOTE: Docker is NOT available in the build workspace, so this file is
+# written and reviewed but has not been run here. It is verified on the
+# developer's machine (ASUS TUF F16, RTX 3050) with `docker compose up`.
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: cybermap-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cybermap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-.env}
+      POSTGRES_DB: ${POSTGRES_DB:-cybermap}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cybermap}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: cybermap-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../infrastructure/docker/backend.Dockerfile
+    container_name: cybermap-backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-cybermap}:${POSTGRES_PASSWORD:-change-me-in-.env}@db:5432/${POSTGRES_DB:-cybermap}
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: http://localhost:3000
+      ENVIRONMENT: development
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/code
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../infrastructure/docker/frontend.Dockerfile
+    container_name: cybermap-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  pgdata:
+  redisdata:
